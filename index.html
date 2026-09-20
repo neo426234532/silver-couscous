@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>BPB Route Cleaner</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1115;
+    color: #e8eaed;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 30px 18px 50px;
+}
+
+h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+}
+
+.subtitle {
+    color: #9aa0a6;
+    margin-bottom: 25px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.panel {
+    background: #171a21;
+    border: 1px solid #292e38;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+textarea {
+    width: 100%;
+    height: 560px;
+    resize: vertical;
+
+    background: #0b0d11;
+    color: #e8eaed;
+
+    border: 1px solid #303642;
+    border-radius: 9px;
+
+    padding: 14px;
+
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+
+    outline: none;
+}
+
+textarea:focus {
+    border-color: #68707d;
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 12px;
+}
+
+button {
+    border: 1px solid #3a414d;
+    border-radius: 8px;
+
+    background: #222731;
+    color: white;
+
+    padding: 10px 15px;
+
+    cursor: pointer;
+    font-weight: 600;
+}
+
+button:hover {
+    background: #2c323d;
+}
+
+.primary {
+    background: #e8eaed;
+    color: #111318;
+    border-color: #e8eaed;
+}
+
+.primary:hover {
+    background: white;
+}
+
+.status {
+    margin-top: 12px;
+    min-height: 22px;
+    color: #9aa0a6;
+    font-size: 14px;
+}
+
+.info {
+    margin-top: 18px;
+
+    background: #171a21;
+    border: 1px solid #292e38;
+    border-radius: 12px;
+
+    padding: 18px;
+}
+
+.info h2 {
+    font-size: 17px;
+    margin: 0 0 10px;
+}
+
+.info ul {
+    margin: 8px 0 0 20px;
+    padding: 0;
+
+    color: #b8bec8;
+}
+
+.info li {
+    margin: 6px 0;
+}
+
+code {
+    color: #e1e5ea;
+}
+
+@media (max-width: 800px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    textarea {
+        height: 450px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>BPB Route Cleaner</h1>
+
+    <div class="subtitle">
+        Remove China-specific GeoIP / GeoSite routing from BPB/Xray configurations.
+    </div>
+
+    <div class="grid">
+
+        <!-- INPUT -->
+
+        <div class="panel">
+
+            <label for="input">
+                Input Config
+            </label>
+
+            <textarea
+                id="input"
+                spellcheck="false"
+                placeholder="Paste your BPB / Xray JSON configuration here..."
+            ></textarea>
+
+            <div class="buttons">
+
+                <button
+                    class="primary"
+                    onclick="convertConfig()"
+                >
+                    Convert
+                </button>
+
+                <button onclick="clearAll()">
+                    Clear
+                </button>
+
+                <button onclick="loadExample()">
+                    Test Example
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- OUTPUT -->
+
+        <div class="panel">
+
+            <label for="output">
+                Converted Config
+            </label>
+
+            <textarea
+                id="output"
+                spellcheck="false"
+                readonly
+                placeholder="Your cleaned JSON will appear here..."
+            ></textarea>
+
+            <div class="buttons">
+
+                <button
+                    class="primary"
+                    onclick="copyOutput()"
+                >
+                    Copy JSON
+                </button>
+
+                <button onclick="downloadOutput()">
+                    Download JSON
+                </button>
+
+            </div>
+
+            <div
+                id="status"
+                class="status"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- INFORMATION -->
+
+    <div class="info">
+
+        <h2>Removed</h2>
+
+        <ul>
+
+            <li>
+                <code>geoip:cn</code> routing rules
+            </li>
+
+            <li>
+                <code>geosite:cn</code> routing rules
+            </li>
+
+            <li>
+                DNS rules using
+                <code>expectIPs: ["geoip:cn"]</code>
+            </li>
+
+            <li>
+                China-specific domestic DNS tags
+            </li>
+
+            <li>
+                Routing rules referring to removed China DNS tags
+            </li>
+
+        </ul>
+
+
+        <h2 style="margin-top:18px;">
+            Preserved
+        </h2>
+
+        <ul>
+
+            <li>
+                VLESS server and UUID
+            </li>
+
+            <li>
+                TLS and WebSocket configuration
+            </li>
+
+            <li>
+                TLS fingerprint and cipher suites
+            </li>
+
+            <li>
+                Fragment / finalmask settings
+            </li>
+
+            <li>
+                Normal DNS configuration
+            </li>
+
+            <li>
+                Private IP and private domain direct routing
+            </li>
+
+            <li>
+                Google proxy routing
+            </li>
+
+            <li>
+                Other non-China routing rules
+            </li>
+
+        </ul>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/*
+=========================================================
+BPB ROUTE CLEANER
+=========================================================
+*/
+
+
+/*
+Convert a value into an array.
+
+This makes the code work with both:
+
+"something": "value"
+
+and:
+
+"something": ["value1", "value2"]
+*/
+
+function asArray(value) {
+
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    return [];
+
+}
+
+
+/*
+Check whether a value contains:
+
+geoip:cn
+
+or:
+
+geosite:cn
+*/
+
+function containsChina(value) {
+
+    if (typeof value === "string") {
+
+        const v = value.toLowerCase();
+
+        return (
+            v === "geoip:cn" ||
+            v === "geosite:cn"
+        );
+
+    }
+
+
+    if (Array.isArray(value)) {
+
+        return value.some(
+            containsChina
+        );
+
+    }
+
+
+    return false;
+
+}
+
+
+/*
+Detect China-specific DNS servers.
+*/
+
+function isChinaDnsServer(server) {
+
+    if (
+        !server ||
+        typeof server !== "object"
+    ) {
+
+        return false;
+
+    }
+
+
+    const domains =
+        asArray(server.domains)
+        .map(String)
+        .map(x => x.toLowerCase());
+
+
+    const tag =
+        String(server.tag || "")
+        .toLowerCase();
+
+
+    /*
+    Example:
+
+    "expectIPs": [
+        "geoip:cn"
+    ]
+    */
+
+    if (
+        containsChina(
+            server.expectIPs
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    /*
+    Example:
+
+    "domains": [
+        "geosite:cn"
+    ]
+    */
+
+    if (
+        domains.includes(
+            "geosite:cn"
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    /*
+    BPB-style China DNS tags.
+    */
+
+    if (
+        tag.includes(
+            "domestic-dns_cn"
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    if (
+        tag.includes(
+            "domestic-dns_3"
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    if (
+        tag.includes(
+            "cn_expect"
+        )
+    ) {
+
+        return true;
+
+    }
+
+
+    return false;
+
+}
+
+
+/*
+Detect China routing rules.
+*/
+
+function isChinaRoutingRule(rule) {
+
+    if (
+        !rule ||
+        typeof rule !== "object"
+    ) {
+
+        return false;
+
+    }
+
+
+    /*
+    Remove:
+
+    "ip": [
+        "geoip:cn"
+    ]
+
+    and:
+
+    "domain": [
+        "geosite:cn"
+    ]
+    */
+
+    if (
+        containsChina(rule.ip) ||
+        containsChina(rule.domain)
+    ) {
+
+        return true;
+
+    }
+
+
+    /*
+    Remove routing rules that refer
+    to China-specific DNS tags.
+    */
+
+    const inboundTags =
+        asArray(rule.inboundTag)
+        .map(String)
+        .map(x => x.toLowerCase());
+
+
+    for (
+        const tag of inboundTags
+    ) {
+
+        if (
+            tag.includes(
+                "domestic-dns_cn"
+            ) ||
+            tag.includes(
+                "domestic-dns_3"
+            ) ||
+            tag.includes(
+                "cn_expect"
+            )
+        ) {
+
+            return true;
+
+        }
+
+    }
+
+
+    return false;
+
+}
+
+
+/*
+Clean one Xray configuration.
+*/
+
+function cleanConfig(config) {
+
+    const configs =
+        Array.isArray(config)
+            ? config
+            : [config];
+
+
+    const cleaned =
+        configs.map(original => {
+
+            /*
+            Deep clone so the original
+            object isn't modified.
+            */
+
+            const config =
+                JSON.parse(
+                    JSON.stringify(original)
+                );
+
+
+            /*
+            Keep track of DNS tags
+            that we remove.
+            */
+
+            const removedDnsTags =
+                new Set();
+
+
+            /*
+            =========================================
+            DNS
+            =========================================
+            */
+
+            if (
+                config.dns &&
+                Array.isArray(
+                    config.dns.servers
+                )
+            ) {
+
+                config.dns.servers =
+                    config.dns.servers.filter(
+                        server => {
+
+                            if (
+                                isChinaDnsServer(
+                                    server
+                                )
+                            ) {
+
+                                if (
+                                    server.tag
+                                ) {
+
+                                    removedDnsTags.add(
+                                        String(
+                                            server.tag
+                                        ).toLowerCase()
+                                    );
+
+                                }
+
+                                return false;
+
+                            }
+
+
+                            return true;
+
+                        }
+                    );
+
+            }
+
+
+            /*
+            =========================================
+            ROUTING
+            =========================================
+            */
+
+            if (
+                config.routing &&
+                Array.isArray(
+                    config.routing.rules
+                )
+            ) {
+
+                config.routing.rules =
+                    config.routing.rules.filter(
+                        rule => {
+
+                            /*
+                            Remove China GeoIP/
+                            GeoSite rules.
+                            */
+
+                            if (
+                                isChinaRoutingRule(
+                                    rule
+                                )
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            /*
+                            Remove routing rules
+                            referencing DNS tags
+                            that we just removed.
+                            */
+
+                            const inboundTags =
+                                asArray(
+                                    rule.inboundTag
+                                )
+                                .map(String)
+                                .map(
+                                    x =>
+                                        x.toLowerCase()
+                                );
+
+
+                            for (
+                                const tag
+                                of inboundTags
+                            ) {
+
+                                if (
+                                    removedDnsTags.has(
+                                        tag
+                                    )
+                                ) {
+
+                                    return false;
+
+                                }
+
+                            }
+
+
+                            return true;
+
+                        }
+                    );
+
+            }
+
+
+            /*
+            Second routing pass.
+
+            This catches China rules even
+            when there was no DNS section.
+            */
+
+            if (
+                config.routing &&
+                Array.isArray(
+                    config.routing.rules
+                )
+            ) {
+
+                config.routing.rules =
+                    config.routing.rules.filter(
+                        rule =>
+                            !isChinaRoutingRule(
+                                rule
+                            )
+                    );
+
+            }
+
+
+            return config;
+
+        });
+
+
+    /*
+    Preserve the original format.
+
+    If the input was:
+
+    [...]
+
+    return an array.
+
+    If the input was:
+
+    {...}
+
+    return an object.
+    */
+
+    return Array.isArray(config)
+        ? cleaned
+        : cleaned[0];
+
+}
+
+
+/*
+=========================================================
+CONVERT
+=========================================================
+*/
+
+function convertConfig() {
+
+    const input =
+        document
+            .getElementById("input")
+            .value
+            .trim();
+
+
+    const output =
+        document
+            .getElementById("output");
+
+
+    const status =
+        document
+            .getElementById("status");
+
+
+    if (!input) {
+
+        status.textContent =
+            "Paste a JSON config first.";
+
+        return;
+
+    }
+
+
+    try {
+
+        /*
+        Parse JSON.
+        */
+
+        const parsed =
+            JSON.parse(input);
+
+
+        /*
+        Clean it.
+        */
+
+        const cleaned =
+            cleanConfig(parsed);
+
+
+        /*
+        Pretty-print JSON.
+        */
+
+        output.value =
+            JSON.stringify(
+                cleaned,
+                null,
+                2
+            );
+
+
+        status.textContent =
+            "Converted successfully.";
+
+    }
+
+
+    catch (error) {
+
+        output.value = "";
+
+        status.textContent =
+            "Invalid JSON: " +
+            error.message;
+
+    }
+
+}
+
+
+/*
+=========================================================
+COPY
+=========================================================
+*/
+
+async function copyOutput() {
+
+    const output =
+        document
+            .getElementById("output")
+            .value;
+
+
+    const status =
+        document
+            .getElementById("status");
+
+
+    if (!output) {
+
+        status.textContent =
+            "Convert a config first.";
+
+        return;
+
+    }
+
+
+    try {
+
+        await navigator.clipboard.writeText(
+            output
+        );
+
+        status.textContent =
+            "Copied to clipboard.";
+
+    }
+
+    catch {
+
+        /*
+        Fallback for browsers where
+        clipboard API is unavailable.
+        */
+
+        const textarea =
+            document.getElementById(
+                "output"
+            );
+
+        textarea.select();
+
+        document.execCommand(
+            "copy"
+        );
+
+        status.textContent =
+            "Copied to clipboard.";
+
+    }
+
+}
+
+
+/*
+=========================================================
+DOWNLOAD
+=========================================================
+*/
+
+function downloadOutput() {
+
+    const output =
+        document
+            .getElementById("output")
+            .value;
+
+
+    const status =
+        document
+            .getElementById("status");
+
+
+    if (!output) {
+
+        status.textContent =
+            "Convert a config first.";
+
+        return;
+
+    }
+
+
+    const blob =
+        new Blob(
+            [output],
+            {
+                type:
+                    "application/json;charset=utf-8"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    link.href = url;
+
+    link.download =
+        "cleaned-config.json";
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+
+    link.remove();
+
+
+    URL.revokeObjectURL(
+        url
+    );
+
+
+    status.textContent =
+        "Downloaded cleaned-config.json.";
+
+}
+
+
+/*
+=========================================================
+CLEAR
+=========================================================
+*/
+
+function clearAll() {
+
+    document
+        .getElementById("input")
+        .value = "";
+
+
+    document
+        .getElementById("output")
+        .value = "";
+
+
+    document
+        .getElementById("status")
+        .textContent = "";
+
+}
+
+
+/*
+=========================================================
+TEST EXAMPLE
+=========================================================
+*/
+
+function loadExample() {
+
+    const example = [
+
+        {
+
+            "routing": {
+
+                "domainStrategy":
+                    "AsIs",
+
+                "rules": [
+
+                    {
+                        "ip": [
+                            "geoip:private"
+                        ],
+                        "outboundTag":
+                            "direct",
+                        "type":
+                            "field"
+                    },
+
+                    {
+                        "ip": [
+                            "geoip:cn"
+                        ],
+                        "outboundTag":
+                            "direct",
+                        "type":
+                            "field"
+                    },
+
+                    {
+                        "domain": [
+                            "geosite:cn"
+                        ],
+                        "outboundTag":
+                            "direct",
+                        "type":
+                            "field"
+                    },
+
+                    {
+                        "domain": [
+                            "geosite:google"
+                        ],
+                        "outboundTag":
+                            "proxy",
+                        "type":
+                            "field"
+                    }
+
+                ]
+
+            }
+
+        }
+
+    ];
+
+
+    document
+        .getElementById("input")
+        .value =
+        JSON.stringify(
+            example,
+            null,
+            2
+        );
+
+
+    document
+        .getElementById("output")
+        .value = "";
+
+
+    document
+        .getElementById("status")
+        .textContent =
+        "Test example loaded.";
+
+}
+
+</script>
+
+</body>
+</html>
